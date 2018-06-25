@@ -1,6 +1,6 @@
 #!/bin/bash
 
-usage_message="usage: docker run kadimasolutions/lizardfs [master|metalogger|chunkserver|cgiserver|client]"
+usage_message="usage: docker run johnymnemonic/rpi-lizardfs [master|metalogger|chunkserver|cgiserver|client]"
 
 # Configure LizardFS
 if [ ! "$SKIP_CONFIGURE" = "true" ]; then
