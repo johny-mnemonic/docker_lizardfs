@@ -1,0 +1,85 @@
+version: '3.6'
+services:
+  mfsmaster:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: master
+    environment:
+      MFSMASTER_AUTO_RECOVERY: 1
+    networks:
+      - lizardfs
+    volumes:
+      - /lizardfs/mfsmaster:/var/lib/lizardfs
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.labels.lizardfs.master-personality==master
+  mfsmaster-shadow:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: master
+    networks:
+      - lizardfs
+    environment:
+      MFSMASTER_PERSONALITY: shadow
+    volumes:
+      - /lizardfs/mfsmaster:/var/lib/lizardfs
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.labels.lizardfs.master-personality==shadow
+  chunkserver:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: chunkserver
+    networks:
+      - lizardfs
+    environment:
+      # This lets you run the chunkserver with less available disk space
+      MFSCHUNKSERVER_HDD_LEAVE_SPACE_DEFAULT: 40Mi # 4Gi is the default
+      MFSHDD_1: /mnt/mfshdd
+    volumes:
+      - /lizardfs/chunkserver:/mnt/mfshdd
+    deploy:
+      mode: global
+    depends_on:
+      - mfsmaster
+  cgiserver:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: cgiserver
+    networks:
+      - lizardfs
+    restart: on-failure
+    ports:
+      - 8080:80
+    deploy:
+      replicas: 1
+    depends_on:
+      - mfsmaster
+  docker-plugin:
+    image: johnymnemonic/rpi-lizardfs-docker:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - "--restart=always -v /var/lib/docker/plugins/lizardfs/propagated-mount:/mnt/docker-volumes/:rshared -v /run/docker/plugins/lizardfs:/run/docker/plugins/ --net lizardfs_lizardfs --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt=apparmor:unconfined -e ROOT_VOLUME_NAME=lizardfs -e LOG_LEVEL=debug -e REMOTE_PATH=/docker/volumes -e LOCAL_PATH=/var/lib/docker/plugins/lizardfs/propagated-mount -e MOUNT_OPTIONS='-o big_writes -o cacheexpirationtime=500 -o readaheadmaxwindowsize=1024' johnymnemonic/rpi-lizardfs-driver:latest"
+    environment:
+      CONTAINER_NAME: lizardfs-plugin
+    deploy:
+      mode: global
+    depends_on:
+      - mfsmaster
+  lizardfs-client:
+    image: johnymnemonic/rpi-lizardfs-docker:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - "--restart=always --net lizardfs_lizardfs --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt=apparmor:unconfined johnymnemonic/rpi-lizardfs client"
+    environment:
+      CONTAINER_NAME: lizardfs-client
+    deploy:
+      mode: global
+    depends_on:
+      - mfsmaster
+
+networks:
+  lizardfs:
+    attachable: true
