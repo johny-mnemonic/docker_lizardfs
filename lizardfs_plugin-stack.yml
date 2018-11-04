@@ -1,0 +1,92 @@
+version: '3.6'
+services:
+  mfsmaster:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: master
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    environment:
+      MFSMASTER_AUTO_RECOVERY: 1
+    networks:
+      - host
+    volumes:
+      - /lizardfs/mfsmaster:/var/lib/lizardfs
+      # Local time inside container
+      - /etc/localtime:/etc/localtime:ro
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.labels.lizardfs.master-personality==master
+  mfsmaster-shadow:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: master
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    networks:
+      - host
+    environment:
+      MFSMASTER_PERSONALITY: shadow
+    volumes:
+      - /lizardfs/mfsmaster:/var/lib/lizardfs
+      # Local time inside container
+      - /etc/localtime:/etc/localtime:ro
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.labels.lizardfs.master-personality==shadow
+  chunkserver:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: chunkserver
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    networks:
+      - host
+    environment:
+      # This lets you run the chunkserver with less available disk space
+      MFSCHUNKSERVER_HDD_LEAVE_SPACE_DEFAULT: 400Mi # 4Gi is the default
+      MFSHDD_1: /mnt/mfshdd
+    volumes:
+      - /lizardfs/chunkserver:/mnt/mfshdd
+      # Local time inside container
+      - /etc/localtime:/etc/localtime:ro
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.labels.lizardfs.role==chunkserver
+  cgiserver:
+    image: johnymnemonic/rpi-lizardfs:latest
+    command: cgiserver
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    networks:
+      - host
+    volumes:
+      # Local time inside container
+      - /etc/localtime:/etc/localtime:ro
+    restart: on-failure
+#    ports:
+#      - 8080:80
+    environment:
+      CGI_PORT: 8080
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.lizardfs.master-personality==master 
+  lizardfs-client:
+    image: johnymnemonic/rpi-lizardfs-docker:latest
+    hostname: "{{.Node.Hostname}}-{{.Service.Name}}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Local time inside container
+      - /etc/localtime:/etc/localtime:ro
+    command:
+      - "--restart=always --net host -v /etc/localtime:/etc/localtime:ro --cap-add SYS_ADMIN --device=/dev/fuse:/dev/fuse --security-opt=apparmor:unconfined --hostname=`hostname` johnymnemonic/rpi-lizardfs client"
+    environment:
+      CONTAINER_NAME: lizardfs-client
+    deploy:
+      mode: global
+
+networks:
+  host:
+    external:
+      name: host
