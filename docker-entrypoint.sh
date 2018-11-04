@@ -21,7 +21,7 @@ elif [ "$1" = "chunkserver" ]; then
 
 elif [ "$1" = "cgiserver" ]; then
     echo "Starting LizardFS CGI Server"
-    exec lizardfs-cgiserver -v -P 80
+    exec lizardfs-cgiserver -v -P ${CGI_PORT:-80}
 
 elif [ "$1" = "client" ]; then
     if [ "$2" = "--help" -o "$2" = "-h" ]; then
